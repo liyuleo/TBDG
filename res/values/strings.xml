@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">TBDG</string>
+    <string name="hello_world">Hello world!</string>
+    
+	<string name="search">Search</string>
+	
+	<string name="produt_preview_image">Image</string>
+	<string name="rmb_sign">¥</string>
+	
+</resources>
