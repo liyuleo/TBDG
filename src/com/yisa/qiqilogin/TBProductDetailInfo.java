@@ -1,7 +1,16 @@
 package com.yisa.qiqilogin;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import android.os.AsyncTask;
+import android.util.Log;
+
 
 /**
  * TB商品的具体信息
@@ -48,37 +57,98 @@ public class TBProductDetailInfo {
 	private List<TBProductImg> mImageList;
 	
 	//商品的实际价格HashMap，和具体的选项相关联的
-    private HashMap<String, Float> mPriceMap;
+    private HashMap<String, Double> mPriceMap;
 
     //商品描述, 字数要大于5个字符，小于25000个字符
     private String mDescripe;
     
-    //商品属性名称。标识着props内容里面的pid和vid所对应的名称。格式为：pid1:vid1:pid_name1:vid_name1;pid2:vid2:pid_name2:vid_name2……(注：属性名称中的冒号":"被转换为："#cln#"; 分号";"被转换为："#scln#" )
-    private String mPropNames;
+    //所有分支产品，既多个属性的的组合，注意：这里是通过属性名得到属性的分支ID
+    private HashMap<String, Long> mAllPropertys;
     
-    public String getAllSkuPropNames(){
-    	StringBuffer sb = new StringBuffer();
-    	if(mSkuList != null){
-    		int length = mSkuList.size();
-    		for (int i = 0; i < length; i++) {
-    			TBProductSku productSku = mSkuList.get(i);
-    			sb.append(productSku.getPropertieName());
-    			sb.append(";");
+    //商品的属性中文名称:<id, 中文名称>
+    private HashMap<String, String> mPropertyNames;
+    
+    //商品的属性值中文名称:<id, 中文名称>
+	private HashMap<String, String> mPropertyValues;
+    
+	public TBProductDetailInfo() {
+		mPropertyNames = new HashMap<String, String>();
+		mAllPropertys = new HashMap<String, Long>();
+		mPropertyValues = new HashMap<String, String>();
+	}
+	
+	// 得到商品的中文属性名称：如颜色，大小。具体有多少个属性，由返回的数组长度决定
+	public String[] getPropertyNameCN() {
+		if (mPropertyNames != null) {
+			int size = mPropertyNames.size();
+			String[] keyNames = new String[size];
+			Iterator<String> propertyNameIterator = mPropertyNames.keySet()
+					.iterator();
+			int i = 0;
+			while (propertyNameIterator.hasNext()) {
+				String name = propertyNameIterator.next();
+				keyNames[i] = mPropertyNames.get(name);
+				i++;
 			}
-    	}
-    	
-    	return sb.toString();
-    }
-    
-    
-	public String getPropNames() {
-		return mPropNames;
+			return keyNames;
+		}
+		return null;
 	}
+	
+	
+	//得到属性ID与属性中文名称的对应关系，得到属性值ID和属性值的实际含义的对应关系
+	private void sortPropertyName() {
+		if (mSkuList != null) {
+			int length = mSkuList.size();
+			for (int i = 0; i < length; i++) {
+				TBProductSku productSku = mSkuList.get(i);
+				mAllPropertys.put(productSku.getProperties(), productSku.getSkuID());
+				
+				ArrayList<TBProductProperty> productPropertyList = productSku.getTbProductProperties();
+				int size = productPropertyList.size();
+				for (int j = 0; j < size; j++) {
+					TBProductProperty productProperty = productPropertyList.get(j);
+					String nameID = productProperty.getNameID();
+					String name = productProperty.getName();
+					String valueID = productProperty.getValueID();
+					String value = productProperty.getValue();
+					
+					if(!mPropertyNames.containsKey(nameID)){
+						mPropertyNames.put(nameID, name);
+					}
+					
+					if(!mPropertyValues.containsKey(valueID)){
+						mPropertyValues.put(valueID, value);
+					}
+					
+				}
+			}
+		}
 
-	public void setPropNames(String propNames) {
-		mPropNames = propNames;
 	}
-
+	
+	//得到某个属性的全部值
+	public TreeSet<String> getPropertyValueByName(String propertyNameID){
+		TreeSet<String> values = new TreeSet<String>(); 
+		if(mAllPropertys != null){
+			String keyReg =  propertyNameID+ ":(\\d+)";
+			Pattern pattern = Pattern.compile(keyReg);
+			Matcher matcher = null;
+			Iterator<String> propertyNameIterator = mAllPropertys.keySet().iterator();
+			while(propertyNameIterator.hasNext()){
+				String propertyNames = propertyNameIterator.next();
+				if(propertyNames != null){
+					matcher = pattern.matcher(propertyNames);
+					if(matcher.find()){
+						values.add(mPropertyValues.get(matcher.group(1)));
+					}
+				}
+			}
+		}
+		
+		return values;
+	}
+    
 	public String getDescripe() {
 		return mDescripe;
 	}
@@ -87,11 +157,11 @@ public class TBProductDetailInfo {
 		mDescripe = descripe;
 	}
 
-	public HashMap<String, Float> getPriceMap() {
+	public HashMap<String, Double> getPriceMap() {
 		return mPriceMap;
 	}
 
-	public void setPriceMap(HashMap<String, Float> priceMap) {
+	public void setPriceMap(HashMap<String, Double> priceMap) {
 		mPriceMap = priceMap;
 	}
 
@@ -143,11 +213,21 @@ public class TBProductDetailInfo {
 		mPrice = price;
 	}
 	
-	public double getFinalPrice() {
+	public double getFinalPrice(String property) {
+		if (mPriceMap == null) {
+			syncFinalPrice();
+		}
+
+		mFinalPrice = mPriceMap.get(property);
+
 		return mFinalPrice;
 	}
 
-	public void setmFinalPrice(double finalPrice) {
+	public void syncFinalPrice() {
+		new QueryPriceAsyncTask().execute(mProductID);
+	}
+	
+	public void setFinalPrice(double finalPrice) {
 		mFinalPrice = finalPrice;
 	}
 
@@ -171,7 +251,7 @@ public class TBProductDetailInfo {
 		return mDetailInfoUrl;
 	}
 
-	public void setmDetailInfoUrl(String detailInfoUrl) {
+	public void setDetailInfoUrl(String detailInfoUrl) {
 		mDetailInfoUrl = detailInfoUrl;
 	}
 
@@ -187,8 +267,23 @@ public class TBProductDetailInfo {
 		return mSkuList;
 	}
 
+	//设置分支商品列表时，进行商品属性的格式化操作
 	public void setSkuList(List<TBProductSku> skuList) {
 		mSkuList = skuList;
+		sortPropertyName();
+		
+//		Iterator<String> names = mPropertyNames.keySet().iterator();
+//		while(names.hasNext()){
+//			String name = names.next();
+//			Log.e("liyu", name + ":" + mPropertyNames.get(name));
+//			sortPropertyValueByName(name);
+//		}
+		
+//		String[] names = getPropertyNameCN();
+//		for (int i = 0; i < names.length; i++) {
+//			Log.e("liyu", i + ":" + names[i]);
+//			
+//		}
 	}
 
 	public List<TBProductImg> getImageList() {
@@ -199,9 +294,6 @@ public class TBProductDetailInfo {
 		mImageList = imageList;
 	}
 
-	public TBProductDetailInfo() {
-		
-	}
 	
 	@Override
 	public String toString(){
@@ -222,11 +314,32 @@ public class TBProductDetailInfo {
 			sb.append("mImageList.size:"+mImageList.size() + "\n");
 		}
 		
-		sb.append("属性名称:" +  mPropNames + "\n");
 		sb.append("详情页地址:" + mDetailInfoUrl + "\n");
 		sb.append("主图片地址:" + mPictureUrl);
 		
 		return sb.toString();
 	}
 
+	class QueryPriceAsyncTask extends AsyncTask<Long, Void, String>{
+
+		@Override
+		protected String doInBackground(Long... params) {
+			long id = params[0].longValue();
+			String source = TBProductDetailInfoParse.getRealPrice(id);
+			return source;
+		}
+		
+		
+		@Override
+		protected void onPostExecute(String result) {
+			try {
+				mPriceMap = TBProductDetailInfoParse.parseRealPrice(result);
+				Log.e("liyu", mPriceMap.toString());
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+		
+		
+	}
 }

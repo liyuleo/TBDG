@@ -63,7 +63,7 @@ public class TBProductDetailActivity extends Activity {
 				break;
 			case MESSAGE_GETTEXT_FINISHED:
 				TBProductDetailInfo info = TBProductDetailInfoParse.getTBProductDetailInfo(mText);
-				Log.e("liyu", "text:"+info.getAllSkuPropNames());
+				//info.getAllSkuPropNames();
 				
 				mHtmlTextView.setText(info.toString());
 //				mWebView.setVisibility(View.VISIBLE);

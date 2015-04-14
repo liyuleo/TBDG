@@ -26,7 +26,7 @@ import android.util.Log;
  * @author leo 2015.04.08
  */
 public class TBProductDetailInfoParse {
-	public static final String QUERY_FIELDS = "cid,desc,detail_url,item_img,location,nick,num,num_iid,pic_url,price,props_name,sku,title";
+	public static final String QUERY_FIELDS = "cid,desc,detail_url,item_img,location,nick,num,num_iid,pic_url,price,sku,title";
 
 	private static final String LOG = "TBProductDetailInfoParse";
 
@@ -55,7 +55,7 @@ public class TBProductDetailInfoParse {
 	//商品属性 格式：pid:vid;pid:vid
     static final String KEY_PROPS = "props";
 	
-	//商品属性名称。标识着props内容里面的pid和vid所对应的名称。格式为：pid1:vid1:pid_name1:vid_name1;pid2:vid2:pid_name2:vid_name2……(注：属性名称中的冒号":"被转换为："#cln#"; 分号";"被转换为："#scln#" )
+	//商品属性名称。标识着props内容里面的pid和vid所对应的名称。
 	static final String KEY_PROPS_NAME = "props_name";
 	
 	// Sku列表:fields中只设置sku可以返回Sku结构体中所有字段，如果设置为sku.sku_id、sku.properties、sku.quantity等形式就只会返回相应的字段
@@ -124,22 +124,22 @@ public class TBProductDetailInfoParse {
 		TBProductDetailInfo info = new TBProductDetailInfo();
 		try {
 			JSONObject products = new JSONObject(soucrce);
-			JSONObject itemFromResponse = products
-					.getJSONObject(KEY_ITEM_GET_RESPONSE);
+			JSONObject itemFromResponse = products.getJSONObject(KEY_ITEM_GET_RESPONSE);
 			JSONObject item = itemFromResponse.getJSONObject(KEY_ITEM);
 			info.setProductName(item.getString(KEY_TITLE));
 			info.setShopName(item.getString(KEY_NICK));
 			info.setPrice(item.getDouble(KEY_PRICE));
 			info.setCID(item.getLong(KEY_CID));
 			info.setProductID(item.getLong(KEY_NUM_IID));
+			info.syncFinalPrice();
 			info.setDescripe(item.getString(KEY_DESC));
 			info.setStock(item.getInt(KEY_NUM));
-			info.setmDetailInfoUrl(item.getString(KEY_DETAIL_URL));
+			info.setDetailInfoUrl(item.getString(KEY_DETAIL_URL));
 			info.setPictureUrl(item.getString(KEY_PIC_URL));
 			info.setLocation(parseLocation(item.getJSONObject(KEY_LOCALTION)));
-			info.setSkuList(parseSkus(item.getJSONObject(KEY_SKUS)));
 			info.setImageList(parseImages(item.getJSONObject(KEY_ITEM_IMGS)));
-			info.setPropNames(item.getString(KEY_PROPS_NAME));
+			info.setSkuList(parseSkus(item.getJSONObject(KEY_SKUS)));
+			
 		} catch (JSONException e) {
 			Log.e(LOG, "parse JSON exception:" + e.getMessage());
 			e.printStackTrace();
@@ -178,8 +178,7 @@ public class TBProductDetailInfoParse {
 			String properties = jsonObject.getString(KEY_SKU_PROPERTIES);
 			String propertieName = jsonObject.getString(KEY_SKU_PROPERTIES_NAME);
 			
-			TBProductSku tbProductSku = new TBProductSku(skuID, stock, price,
-					properties, propertieName);
+			TBProductSku tbProductSku = new TBProductSku(skuID, stock, price, properties, propertieName);
 			tbProductSkusList.add(tbProductSku);
 		}
 		return tbProductSkusList;
@@ -190,8 +189,7 @@ public class TBProductDetailInfoParse {
 			throws JSONException {
 		JSONArray imageArray = images.getJSONArray(KEY_ITEM_IMG);
 		int length = imageArray.length();
-		List<TBProductImg> tbProductImageList = new ArrayList<TBProductImg>(
-				length);
+		List<TBProductImg> tbProductImageList = new ArrayList<TBProductImg>(length);
 		for (int i = 0; i < length; i++) {
 			JSONObject jsonObject = (JSONObject) imageArray.get(i);
 			String url = jsonObject.getString(KEY_ITEM_IMG_URL);
@@ -256,8 +254,7 @@ public class TBProductDetailInfoParse {
 	}
 
 	// 解析商品的促销价格
-	public static HashMap<String, Double> parseRealPrice(String source)
-			throws Exception {
+	public static HashMap<String, Double> parseRealPrice(String source) throws Exception {
 		// String priceReg = "price:\"(\\d+\\.?\\d*)\"";
 		// String keyReg = ";(\\d+:\\d+;)+";
 		// String keyReg = "\";(\\d+:\\d+;)+\":\\["+"(.*?])";
@@ -284,4 +281,6 @@ public class TBProductDetailInfoParse {
 
 		return prices;
 	}
+	
+	
 }

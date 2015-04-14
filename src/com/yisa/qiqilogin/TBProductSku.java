@@ -1,5 +1,9 @@
 package com.yisa.qiqilogin;
 
+import java.util.ArrayList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
  * TB商品的分组结构
  * 
@@ -21,20 +25,38 @@ public class TBProductSku {
 	
 	// sku所对应的销售属性的中文名字串，格式如：pid1:vid1:pid_name1:vid_name1;pid2:vid2:pid_name2:vid_name2……
 	private String mPropertieName;
-
+    
+	//属性列表可不能有多个属性（颜色，尺寸等）
+	private ArrayList<TBProductProperty> mTbProductProperties; 
+	
 	public TBProductSku() {
 		
 	}
 
 	public TBProductSku(long skuID, int stock, double price, String properties,
 			String propertieName) {
-		mSkuID = skuID;
-		mStock = stock;
-		mPrice = price;
-		mProperties = properties;
-		mPropertieName = propertieName;
+		mTbProductProperties = new ArrayList<TBProductProperty>();
+		setSkuID(skuID);
+		setStock(stock);
+		setPrice(price);
+		setProperties(properties);
+		setPropertieName(propertieName);
 	}
 
+	public ArrayList<TBProductProperty> getTbProductProperties(){
+		return mTbProductProperties;
+	}
+	
+	public int getPropKeyNumber(){
+		int number = 0;
+		if(mProperties != null){
+			String[] array = mProperties.split(";");
+			number = array.length; 
+		}
+		return number;
+	}
+	
+	
 	@Override
 	public String toString(){
 		return "ID:" + mSkuID + ",库存:" + mStock + ",价格:" + mPrice + ",属性:" + mProperties + ",中文属性:" + mPropertieName;
@@ -60,7 +82,7 @@ public class TBProductSku {
 		return mPrice;
 	}
 
-	public void setmPrice(double price) {
+	public void setPrice(double price) {
 		mPrice = price;
 	}
 
@@ -78,6 +100,24 @@ public class TBProductSku {
 
 	public void setPropertieName(String propertieName) {
 		mPropertieName = propertieName;
+		formatProperty(propertieName);
+	}
+	
+	private void formatProperty(String source) {
+		if (source != null) {
+			String keyReg = "(\\d+):(\\d+):(\\w+):(\\w+)";
+			Pattern patten = Pattern.compile(keyReg, Pattern.DOTALL);
+			Matcher matcher = patten.matcher(source);
+			TBProductProperty productProperty;
+			while(matcher.find()){
+				productProperty = new TBProductProperty();
+				productProperty.setNameID(matcher.group(1));
+				productProperty.setName(matcher.group(3));
+				productProperty.setValueID(matcher.group(2));
+				productProperty.setValue(matcher.group(4));
+				mTbProductProperties.add(productProperty);
+			}
+		}
 	}
 
 }
