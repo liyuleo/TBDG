@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -132,6 +133,7 @@ public class TBProductDetailInfoParse {
 			info.setCID(item.getLong(KEY_CID));
 			info.setProductID(item.getLong(KEY_NUM_IID));
 			info.syncFinalPrice();
+			info.syncPostageFee();
 			info.setDescripe(item.getString(KEY_DESC));
 			info.setStock(item.getInt(KEY_NUM));
 			info.setDetailInfoUrl(item.getString(KEY_DETAIL_URL));
@@ -201,6 +203,49 @@ public class TBProductDetailInfoParse {
 		return tbProductImageList;
 	}
 
+	// 联网获取商品发到广东的邮资
+	public static String getPostageFee(long id) {
+		String url = getPostageFeeUrl(id);
+		String result = postUrl(url, "gbk");
+		return result;
+	}
+	
+	// 发送Post请求，并指定返回内容的编码格式
+	public static String postUrl(String url, String encoding) {
+		InputStream is = null;
+		String result = "";
+		try {
+			HttpClient httpclient = new DefaultHttpClient();
+			HttpPost httppost = new HttpPost(url);
+			httppost.setHeader(
+					"User-Agent",
+					"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.124 Safari/537.36");
+			HttpResponse response = httpclient.execute(httppost);
+			HttpEntity entity = response.getEntity();
+
+			is = entity.getContent();
+		} catch (Exception e) {
+			return "Fail to establish http connection!" + e.toString();
+		}
+
+		try {
+			BufferedReader reader = new BufferedReader(new InputStreamReader(
+					is, encoding));
+			StringBuilder sb = new StringBuilder();
+			String line = null;
+			while ((line = reader.readLine()) != null) {
+				sb.append(line + "\n");
+			}
+			is.close();
+
+			result = sb.toString();
+		} catch (Exception e) {
+			return "Fail to convert net stream!";
+		}
+
+		return result;
+	}
+	
 	// 联网获取商品的促销价格
 	public static String getRealPrice(long id) {
 		InputStream is = null;
@@ -252,7 +297,26 @@ public class TBProductDetailInfoParse {
 				+ id
 				+ "&sellerId=123959625&p=1&rcid=50008163&sts=269553664,1170936092170387524,33554560,70373043404803&chnl=&price=6000&shopId=&vd=1&skil=false&pf=1&al=false&ap=0&ss=0&free=1&st=1&ct=1&prior=1&ref=";
 	}
+	
+	// 获取发到广东的邮资的URL
+	private static String getPostageFeeUrl(long id) {
+			return "http://detailskip.taobao.com/json/deliveryFee.htm?areaId=440300&itemId=" + id + "&callback=jsonp211";
+	}
 
+	// 解析商品的邮费
+	public static double parsePostageFee(String source) throws Exception{
+		String keyReg = "<span class=.*?</span>\\s*(\\d+\\.\\d+)?";
+		Pattern patten = Pattern.compile(keyReg, Pattern.DOTALL);
+		Matcher matcher = patten.matcher(source);
+		double postageFee = 0.00;
+		if (matcher.find()) {
+			postageFee = Double.parseDouble(matcher.group(1));
+		} else {
+			postageFee = 0.00d;
+		}
+		return postageFee;
+	}
+	
 	// 解析商品的促销价格
 	public static HashMap<String, Double> parseRealPrice(String source) throws Exception {
 		// String priceReg = "price:\"(\\d+\\.?\\d*)\"";
@@ -272,9 +336,11 @@ public class TBProductDetailInfoParse {
 		String value = null;
 
 		while (matcher.find()) {
+			
 			name = matcher.group(1);
-			value = matcher.group(4);
 			if (name != null) {
+				name = sortParms(name);
+				value = matcher.group(4);
 				prices.put(name, Double.parseDouble(value));
 			}
 		}
@@ -282,5 +348,22 @@ public class TBProductDetailInfoParse {
 		return prices;
 	}
 	
+	//字符串按照“;”分割，然后升序排序重新组装成一个有序的字符串
+	public static String sortParms(String parms) {
+		String[] strArray = parms.split(";");
+
+		// 对属性组进行升序排序
+		Arrays.sort(strArray);
+
+		StringBuffer sb = new StringBuffer();
+
+		for (int i = 0; i < strArray.length; i++) {
+			sb.append(strArray[i]);
+			if (i < strArray.length - 1) {
+				sb.append(";");
+			}
+		}
+		return sb.toString();
+	}
 	
 }

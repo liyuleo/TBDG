@@ -41,6 +41,10 @@ public class TBProductProperty {
 	
 	@Override
 	public String toString(){
-		return mName +"(" + mNameID +")" + " : " + mValue+"("+ mValueID +")" ;
+		return mName + " : " + mValue ;
+	}
+	
+	public String getComparatorFileds(){
+		return mNameID + ":" + mValueID;
 	}
 }

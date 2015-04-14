@@ -1,8 +1,11 @@
 package com.yisa.qiqilogin;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 
 /**
  * TB商品的分组结构
@@ -24,7 +27,7 @@ public class TBProductSku {
 	private String mProperties;
 	
 	// sku所对应的销售属性的中文名字串，格式如：pid1:vid1:pid_name1:vid_name1;pid2:vid2:pid_name2:vid_name2……
-	private String mPropertieName;
+	private String mPropertieNameCN;
     
 	//属性列表可不能有多个属性（颜色，尺寸等）
 	private ArrayList<TBProductProperty> mTbProductProperties; 
@@ -40,26 +43,16 @@ public class TBProductSku {
 		setStock(stock);
 		setPrice(price);
 		setProperties(properties);
-		setPropertieName(propertieName);
+		setPropertieNameCN(propertieName);
 	}
 
 	public ArrayList<TBProductProperty> getTbProductProperties(){
 		return mTbProductProperties;
 	}
 	
-	public int getPropKeyNumber(){
-		int number = 0;
-		if(mProperties != null){
-			String[] array = mProperties.split(";");
-			number = array.length; 
-		}
-		return number;
-	}
-	
-	
 	@Override
 	public String toString(){
-		return "ID:" + mSkuID + ",库存:" + mStock + ",价格:" + mPrice + ",属性:" + mProperties + ",中文属性:" + mPropertieName;
+		return "ID:" + mSkuID + ",库存:" + mStock + ",价格:" + mPrice + ",属性:" + mProperties + ",中文属性:" + mPropertieNameCN;
 	}
 	
 	public long getSkuID() {
@@ -91,15 +84,15 @@ public class TBProductSku {
 	}
 
 	public void setProperties(String properties) {
-		mProperties = properties;
+		mProperties = TBProductDetailInfoParse.sortParms(properties);
 	}
 
-	public String getPropertieName() {
-		return mPropertieName;
+	public String getPropertieNameCN() {
+		return mPropertieNameCN;
 	}
 
-	public void setPropertieName(String propertieName) {
-		mPropertieName = propertieName;
+	public void setPropertieNameCN(String propertieName) {
+		mPropertieNameCN = propertieName;
 		formatProperty(propertieName);
 	}
 	
@@ -117,7 +110,18 @@ public class TBProductSku {
 				productProperty.setValue(matcher.group(4));
 				mTbProductProperties.add(productProperty);
 			}
+			
+			//对属性组进行排序
+			Collections.sort(mTbProductProperties, new PropertyCompator());
 		}
 	}
 
+	//根据属性名ID,属性值ID进行排序
+	class PropertyCompator implements Comparator<TBProductProperty> {
+		@Override
+		public int compare(TBProductProperty p1, TBProductProperty p2) {
+			return p1.getComparatorFileds().compareTo(p2.getComparatorFileds());
+		}
+
+	}
 }

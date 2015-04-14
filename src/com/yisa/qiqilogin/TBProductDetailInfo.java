@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -27,7 +28,7 @@ public class TBProductDetailInfo {
 	private long mProductID;
 	
 	//商品的邮费，需要动态获取
-	private double mPostage;
+	private double mPostageFee;
 	
 	// 商品所属的叶子类目 id
 	private long mCID;
@@ -53,7 +54,7 @@ public class TBProductDetailInfo {
 	// 该商品的分组列表
 	private List<TBProductSku> mSkuList;
 	
-	// 该商品的分组列表
+	// 该商品的图片列表
 	private List<TBProductImg> mImageList;
 	
 	//商品的实际价格HashMap，和具体的选项相关联的
@@ -62,32 +63,38 @@ public class TBProductDetailInfo {
     //商品描述, 字数要大于5个字符，小于25000个字符
     private String mDescripe;
     
-    //所有分支产品，既多个属性的的组合，注意：这里是通过属性名得到属性的分支ID
-    private HashMap<String, Long> mAllPropertys;
+    //所有分支产品，既多个属性的的组合，注意：这里是通过属性名得到属性的分支
+    private HashMap<String, TBProductSku> mAllPropertysMap;
     
     //商品的属性中文名称:<id, 中文名称>
-    private HashMap<String, String> mPropertyNames;
+    private HashMap<String, String> mPropertyNamesCNMap;
     
     //商品的属性值中文名称:<id, 中文名称>
-	private HashMap<String, String> mPropertyValues;
+	private HashMap<String, String> mPropertyValuesCNMap;
     
+	//查询价格的异步任务是否已经开始
+	private boolean mQuaryPriceStart = false;
+	
+	//查询邮资的异步任务是否已经开始
+	private boolean mQuaryPostageFeeStart = false;
+	
 	public TBProductDetailInfo() {
-		mPropertyNames = new HashMap<String, String>();
-		mAllPropertys = new HashMap<String, Long>();
-		mPropertyValues = new HashMap<String, String>();
+		mPropertyNamesCNMap = new HashMap<String, String>();
+		mAllPropertysMap = new HashMap<String, TBProductSku>();
+		mPropertyValuesCNMap = new HashMap<String, String>();
 	}
 	
 	// 得到商品的中文属性名称：如颜色，大小。具体有多少个属性，由返回的数组长度决定
 	public String[] getPropertyNameCN() {
-		if (mPropertyNames != null) {
-			int size = mPropertyNames.size();
+		if (mPropertyNamesCNMap != null) {
+			int size = mPropertyNamesCNMap.size();
 			String[] keyNames = new String[size];
-			Iterator<String> propertyNameIterator = mPropertyNames.keySet()
+			Iterator<String> propertyNameIterator = mPropertyNamesCNMap.keySet()
 					.iterator();
 			int i = 0;
 			while (propertyNameIterator.hasNext()) {
 				String name = propertyNameIterator.next();
-				keyNames[i] = mPropertyNames.get(name);
+				keyNames[i] = mPropertyNamesCNMap.get(name);
 				i++;
 			}
 			return keyNames;
@@ -102,7 +109,8 @@ public class TBProductDetailInfo {
 			int length = mSkuList.size();
 			for (int i = 0; i < length; i++) {
 				TBProductSku productSku = mSkuList.get(i);
-				mAllPropertys.put(productSku.getProperties(), productSku.getSkuID());
+				
+				mAllPropertysMap.put(productSku.getProperties(), productSku);
 				
 				ArrayList<TBProductProperty> productPropertyList = productSku.getTbProductProperties();
 				int size = productPropertyList.size();
@@ -113,12 +121,12 @@ public class TBProductDetailInfo {
 					String valueID = productProperty.getValueID();
 					String value = productProperty.getValue();
 					
-					if(!mPropertyNames.containsKey(nameID)){
-						mPropertyNames.put(nameID, name);
+					if(!mPropertyNamesCNMap.containsKey(nameID)){
+						mPropertyNamesCNMap.put(nameID, name);
 					}
 					
-					if(!mPropertyValues.containsKey(valueID)){
-						mPropertyValues.put(valueID, value);
+					if(!mPropertyValuesCNMap.containsKey(valueID)){
+						mPropertyValuesCNMap.put(valueID, value);
 					}
 					
 				}
@@ -130,17 +138,17 @@ public class TBProductDetailInfo {
 	//得到某个属性的全部值
 	public TreeSet<String> getPropertyValueByName(String propertyNameID){
 		TreeSet<String> values = new TreeSet<String>(); 
-		if(mAllPropertys != null){
+		if(mAllPropertysMap != null){
 			String keyReg =  propertyNameID+ ":(\\d+)";
 			Pattern pattern = Pattern.compile(keyReg);
 			Matcher matcher = null;
-			Iterator<String> propertyNameIterator = mAllPropertys.keySet().iterator();
+			Iterator<String> propertyNameIterator = mAllPropertysMap.keySet().iterator();
 			while(propertyNameIterator.hasNext()){
 				String propertyNames = propertyNameIterator.next();
 				if(propertyNames != null){
 					matcher = pattern.matcher(propertyNames);
 					if(matcher.find()){
-						values.add(mPropertyValues.get(matcher.group(1)));
+						values.add(mPropertyValuesCNMap.get(matcher.group(1)));
 					}
 				}
 			}
@@ -149,6 +157,24 @@ public class TBProductDetailInfo {
 		return values;
 	}
     
+	//得到商品的所有分支属性的数组
+	public String[] getAllProperities() {
+		String[] properities = null;
+		if (mAllPropertysMap != null) {
+			Set<String> keySet = mAllPropertysMap.keySet();
+			int size = keySet.size();
+			properities = new String[size];
+			Iterator<String> iterator = keySet.iterator();
+			int index = 0;
+			while (iterator.hasNext()) {
+				properities[index] = iterator.next();
+				index++;
+			}
+		}
+		return properities;
+	}
+	
+	
 	public String getDescripe() {
 		return mDescripe;
 	}
@@ -197,14 +223,22 @@ public class TBProductDetailInfo {
 		mCID = cid;
 	}
 	
-	public double getPostage() {
-		return mPostage;
+	public double getPostageFee() {
+		return mPostageFee;
 	}
 
-	public void setPostage(double postage) {
-		mPostage = postage;
+	public void setPostageFee(double postage) {
+		mPostageFee = postage;
 	}
 
+	//开始异步查询商品的邮费
+	public void syncPostageFee(){
+		if(!mQuaryPostageFeeStart){
+			mQuaryPostageFeeStart = true;
+			new QueryPostageFeeAsyncTask().execute(mProductID);
+		}
+	}
+	
 	public double getPrice() {
 		return mPrice;
 	}
@@ -217,14 +251,22 @@ public class TBProductDetailInfo {
 		if (mPriceMap == null) {
 			syncFinalPrice();
 		}
+		
+		String key = TBProductDetailInfoParse.sortParms(property);
 
-		mFinalPrice = mPriceMap.get(property);
+		if(mPriceMap != null){
+			mFinalPrice = mPriceMap.get(key);
+		}
 
 		return mFinalPrice;
 	}
 
+	//开始异步查询分支商品的价格
 	public void syncFinalPrice() {
-		new QueryPriceAsyncTask().execute(mProductID);
+		if(!mQuaryPriceStart){
+			new QueryPriceAsyncTask().execute(mProductID);
+			mQuaryPriceStart = true;
+		}
 	}
 	
 	public void setFinalPrice(double finalPrice) {
@@ -271,19 +313,6 @@ public class TBProductDetailInfo {
 	public void setSkuList(List<TBProductSku> skuList) {
 		mSkuList = skuList;
 		sortPropertyName();
-		
-//		Iterator<String> names = mPropertyNames.keySet().iterator();
-//		while(names.hasNext()){
-//			String name = names.next();
-//			Log.e("liyu", name + ":" + mPropertyNames.get(name));
-//			sortPropertyValueByName(name);
-//		}
-		
-//		String[] names = getPropertyNameCN();
-//		for (int i = 0; i < names.length; i++) {
-//			Log.e("liyu", i + ":" + names[i]);
-//			
-//		}
 	}
 
 	public List<TBProductImg> getImageList() {
@@ -294,6 +323,32 @@ public class TBProductDetailInfo {
 		mImageList = imageList;
 	}
 
+	// 通过属性组，得到特定的商品分支，要对属性组进行重新排序
+	public TBProductSku getSkuByProperities(String properities) {
+		if (mAllPropertysMap != null) {
+			String key = TBProductDetailInfoParse.sortParms(properities);
+			return mAllPropertysMap.get(key);
+		}
+		return null;
+	}
+
+	// 通过属性组，得到特定的商品分支的ID
+	public long getSkuIDByProperities(String properities) {
+		TBProductSku sku = getSkuByProperities(properities);
+		if (sku != null) {
+			return sku.getSkuID();
+		}
+		return -1L;
+	}
+
+	// 通过属性组，得到特定的商品分支的库存
+	public int getSkuStockByProperities(String properities) {
+		TBProductSku sku = getSkuByProperities(properities);
+		if (sku != null) {
+			return sku.getStock();
+		}
+		return 0;
+	}
 	
 	@Override
 	public String toString(){
@@ -303,11 +358,27 @@ public class TBProductDetailInfo {
 		sb.append("价格:" + mPrice + "\n");
 		sb.append("所在地:" + mLocation + "\n");
 		sb.append("ID:" + mProductID + "\n");
-		sb.append("CID:" + mCID + "\n");
+		Log.e("liyu", "toString");
+		sb.append("邮费:" + mPostageFee + "\n");
 		sb.append("库存:" +  mStock + "\n");
 		
 		if(mSkuList !=  null){
 			sb.append("mSkuList.size:"+mSkuList.size() + "\n");
+		}
+		
+		String[] properities = getAllProperities();
+		
+		for (int i = 0; i < properities.length; i++) {
+			String properity = properities[i];
+			TBProductSku sku = getSkuByProperities(properity);
+			ArrayList<TBProductProperty> list = sku.getTbProductProperties();
+			int size = list.size();
+			for (int j = 0; j < size; j++) {
+				TBProductProperty tbProperty = list.get(j);
+				sb.append(tbProperty.toString()+"\n");
+			}
+			sb.append("价格:"+getFinalPrice(properity) + "\n");
+			sb.append("库存:"+sku.getStock() + "\n");
 		}
 		
 		if(mImageList !=  null){
@@ -334,12 +405,32 @@ public class TBProductDetailInfo {
 		protected void onPostExecute(String result) {
 			try {
 				mPriceMap = TBProductDetailInfoParse.parseRealPrice(result);
-				Log.e("liyu", mPriceMap.toString());
+				Log.e("liyu", "QueryPriceAsyncTask done");
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
 		
 		
+	}
+	
+	class QueryPostageFeeAsyncTask extends AsyncTask<Long, Void, String> {
+
+		@Override
+		protected String doInBackground(Long... params) {
+			long id = params[0].longValue();
+			String source = TBProductDetailInfoParse.getRealPrice(id);
+			return source;
+		}
+
+		@Override
+		protected void onPostExecute(String result) {
+			try {
+				mPostageFee = TBProductDetailInfoParse.parsePostageFee(result);
+				Log.e("liyu", "QueryPostageFeeAsyncTask done:" + mPostageFee);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
 	}
 }
